@@ -63,7 +63,7 @@ int server_handshake(int *to_client) {
 
   *to_client = open(buffer, O_WRONLY, 0);
   //create SYN_ACK message
-  sranddev();
+  srand(time(NULL));
   int r = rand() % HANDSHAKE_BUFFER_SIZE;
   sprintf(buffer, "%d", r);
 
