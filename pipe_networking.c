@@ -13,8 +13,26 @@
   returns the file descriptor for the upstream pipe.
   =========================*/
 int server_setup() {
-  int from_client = 0;
-  return from_client;
+  printf("[server] creating well known pipe\n");
+  int wkp = mkfifo(WKP, 0600);
+  if (wkp) {
+    printf("[server] couldn't create well known pipe (%s, %d)\n", strerror(errno), errno);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("[server] created well known pipe\n");
+  printf("[server] opening well known pipe for reading\n");
+  wkp = open(WKP, O_RDONLY);
+  if (wkp < 0) {
+    printf("[server] couldn't open well known pipe (%s, %d)\n", strerror(errno), errno);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("[server] opened well known pipe\n");
+  printf("[server] removing well known pipe\n");
+  remove(WKP);
+
+  return wkp;
 }
 
 /*=========================
@@ -26,7 +44,37 @@ int server_setup() {
   returns the file descriptor for the downstream pipe.
   =========================*/
 int server_connect(int from_client) {
-  int to_client  = 0;
+  printf("[subserver] awaiting handshake\n");
+  char handshake[HANDSHAKE_BUFFER_SIZE];
+  int r = read(from_client, handshake, sizeof(handshake));
+  handshake[r] = 0;
+
+  printf("[subserver] recieved handshake\n");
+  printf("[subserver] opening secret pipe named %s\n", handshake);
+
+  int to_client = open(handshake, O_WRONLY);
+  if (to_client < 0) {
+    printf("[subserver] couldn't open secret pipe (%s, %d)\n", strerror(errno), errno);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("[subserver] opened secret pipe\n");
+  printf("[subserver] sending SYN_ACK\n");
+  srand(time(NULL));
+  int syn_ack = rand() % HANDSHAKE_BUFFER_SIZE;
+  sprintf(handshake, "%d", syn_ack);
+
+  write(to_client, handshake, sizeof(handshake));
+
+  printf("[subserver] sent SYN_ACK, awaiting ACK\n");
+  read(from_client, handshake, sizeof(handshake));
+  int recieved_ack = atoi(handshake);
+  if (recieved_ack != syn_ack + 1) {
+    printf("[subserver] handshake received bad ACK %s\n", handshake);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("[subserver] good ACK recieved\n");
   return to_client;
 }
 
